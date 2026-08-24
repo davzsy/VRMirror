@@ -1,0 +1,6 @@
+# Runtime
+PySide6>=6.6,<7          # UI toolkit
+av>=11.0                 # H.264 decoding and MP4 muxing; bundles its own ffmpeg
+
+# Build only (see tools/build.py)
+# pyinstaller>=6.3
