@@ -3,6 +3,7 @@
 # Build with:  python tools/build.py
 # or directly: pyinstaller tools/VRMirror.spec --noconfirm
 
+import os
 import sys
 from pathlib import Path
 
@@ -71,40 +72,62 @@ a = Analysis(
 
 pyz = PYZ(a.pure)
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    [],
-    exclude_binaries=True,
-    name="VRMirror",
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=False,
-    console=False,
-    disable_windowed_traceback=False,
-    icon=icon_arg,
-)
+# One file or one folder. The folder build starts faster because nothing has to
+# be unpacked; the single file is easier to hand to someone. Both share the
+# analysis above, so the excludes apply either way.
+onefile = os.environ.get("VRMIRROR_ONEFILE") == "1"
 
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=False,
-    name="VRMirror",
-)
-
-if sys.platform == "darwin":
-    app = BUNDLE(
-        coll,
-        name="VRMirror.app",
-        icon=str(project_root / "assets" / "icon.icns")
-        if (project_root / "assets" / "icon.icns").is_file()
-        else None,
-        bundle_identifier="dev.vrmirror.app",
-        info_plist={
-            "NSHighResolutionCapable": True,
-            "LSMinimumSystemVersion": "11.0",
-        },
+if onefile:
+    exe = EXE(
+        pyz,
+        a.scripts,
+        a.binaries,
+        a.datas,
+        [],
+        name="VRMirror",
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=False,
+        console=False,
+        disable_windowed_traceback=False,
+        icon=icon_arg,
     )
+else:
+    exe = EXE(
+        pyz,
+        a.scripts,
+        [],
+        exclude_binaries=True,
+        name="VRMirror",
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=False,
+        console=False,
+        disable_windowed_traceback=False,
+        icon=icon_arg,
+    )
+
+    coll = COLLECT(
+        exe,
+        a.binaries,
+        a.datas,
+        strip=False,
+        upx=False,
+        name="VRMirror",
+    )
+
+    if sys.platform == "darwin":
+        app = BUNDLE(
+            coll,
+            name="VRMirror.app",
+            icon=str(project_root / "assets" / "icon.icns")
+            if (project_root / "assets" / "icon.icns").is_file()
+            else None,
+            bundle_identifier="dev.vrmirror.app",
+            info_plist={
+                "NSHighResolutionCapable": True,
+                "LSMinimumSystemVersion": "11.0",
+            },
+        )

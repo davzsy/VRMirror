@@ -22,9 +22,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def run(command: list[str]) -> None:
+def run(command: list[str], env: dict[str, str] | None = None) -> None:
     print(f"$ {' '.join(command)}")
-    result = subprocess.run(command, cwd=ROOT)
+    result = subprocess.run(command, cwd=ROOT, env=env)
     if result.returncode != 0:
         raise SystemExit(result.returncode)
 
@@ -58,45 +58,23 @@ def main() -> int:
 
     ensure_pyinstaller()
 
+    # Both modes go through the spec file so they share its exclude list, which
+    # is what keeps the build near 90 MB instead of 250 MB.
+    env = os.environ.copy()
     if args.onefile:
-        # The spec file builds a directory; onefile is simple enough to express
-        # on the command line instead of maintaining a second spec.
-        command = [
+        env["VRMIRROR_ONEFILE"] = "1"
+
+    run(
+        [
             sys.executable,
             "-m",
             "PyInstaller",
             "--noconfirm",
             "--clean",
-            "--onefile",
-            "--windowed",
-            "--name",
-            "VRMirror",
-            "--hidden-import",
-            "av",
-        ]
-        tools = ROOT / "assets" / "platform-tools"
-        separator = ";" if os.name == "nt" else ":"
-        if tools.is_dir():
-            command += ["--add-data", f"{tools}{separator}assets/platform-tools"]
-        dex = ROOT / "assets" / "vrmirror-server.dex"
-        if dex.is_file():
-            command += ["--add-data", f"{dex}{separator}assets"]
-        icon = ROOT / "assets" / ("icon.ico" if os.name == "nt" else "icon.icns")
-        if icon.is_file():
-            command += ["--icon", str(icon)]
-        command.append(str(ROOT / "run.py"))
-        run(command)
-    else:
-        run(
-            [
-                sys.executable,
-                "-m",
-                "PyInstaller",
-                "--noconfirm",
-                "--clean",
-                str(ROOT / "tools" / "VRMirror.spec"),
-            ]
-        )
+            str(ROOT / "tools" / "VRMirror.spec"),
+        ],
+        env=env,
+    )
 
     dist = ROOT / "dist"
     print("\nBuild finished. Artifacts in:")

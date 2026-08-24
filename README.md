@@ -6,6 +6,9 @@ fully offline: no account, no license server, no internet.
 Built as a replacement for Vysor, whose only online requirement is checking a
 license. The mirroring itself has never needed a network connection.
 
+**[Download the latest release](https://github.com/davzsy/VRMirror/releases/latest)**:
+`VRMirror.exe` for Windows, `VRMirror.dmg` for Apple Silicon Macs.
+
 ```
   headset ──USB or Wi-Fi──▶ adb ──H.264──▶ VRMirror ──▶ your screen
 ```
@@ -61,16 +64,24 @@ using the same address, or plug in and untether again.
 
 ```sh
 python tools/build.py            # a folder in dist/, fastest to start
-python tools/build.py --onefile  # a single file, a few seconds slower to launch
+python tools/build.py --onefile  # a single file, slower to launch
+./tools/make_dmg.sh              # macOS: wrap dist/VRMirror.app in a .dmg
 ```
 
-On Windows this produces `dist/VRMirror/VRMirror.exe` (or `dist/VRMirror.exe`
-with `--onefile`). On macOS it produces `dist/VRMirror.app`.
+The folder build gives `dist/VRMirror/VRMirror.exe` on Windows and
+`dist/VRMirror.app` on macOS. `--onefile` collapses that to a single
+`dist/VRMirror.exe`, which unpacks itself to a temporary directory on every
+launch: convenient to hand to someone, a few seconds slower to start.
+
+Both modes go through `tools/VRMirror.spec`, so they share its exclude list.
+That list is what keeps the build near 90 MB rather than 250 MB, which is why
+`--onefile` sets `VRMIRROR_ONEFILE=1` and reuses the spec instead of passing
+its own flags to PyInstaller.
 
 **PyInstaller does not cross compile.** A Windows `.exe` has to be built on
 Windows. If you develop on a Mac, push the repo to GitHub and let
-`.github/workflows/build.yml` build both; the `.exe` shows up as a workflow
-artifact, and tagging `v0.1.0` attaches it to a release.
+`.github/workflows/build.yml` build both; tagging `v0.1.1` attaches a
+`VRMirror.exe` and a `VRMirror.dmg` to a release.
 
 ## The two capture engines
 

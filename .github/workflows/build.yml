@@ -1,7 +1,7 @@
 name: Build
 
-# Produces ready to run builds for Windows and macOS. Push a tag like v0.1.0 to
-# also get a GitHub Release with both attached.
+# Produces ready to run builds for Windows and macOS: a single .exe and a .dmg.
+# Push a tag like v0.1.0 to also get a GitHub Release with both attached.
 
 on:
   push:
@@ -42,24 +42,38 @@ jobs:
           chmod +x server/build.sh
           ./server/build.sh || echo "device server not built; screenrecord engine will be used"
 
-      - name: Build the application
-        run: python tools/build.py --clean
-
-      - name: Package (Windows)
+      # Windows gets the single file build, macOS gets the .app so it can go
+      # into a disk image.
+      - name: Build the application (Windows)
         if: runner.os == 'Windows'
-        run: Compress-Archive -Path dist/VRMirror/* -DestinationPath VRMirror-windows.zip
-        shell: pwsh
+        run: python tools/build.py --clean --onefile
+
+      - name: Build the application (macOS)
+        if: runner.os == 'macOS'
+        run: python tools/build.py --clean
 
       - name: Package (macOS)
         if: runner.os == 'macOS'
         run: |
-          cd dist
-          zip -qry ../VRMirror-macos.zip VRMirror.app || zip -qry ../VRMirror-macos.zip VRMirror
+          chmod +x tools/make_dmg.sh
+          ./tools/make_dmg.sh
+
+      - name: Check the artifact exists
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            test -f dist/VRMirror.exe || { echo "dist/VRMirror.exe missing"; exit 1; }
+          else
+            test -f dist/VRMirror.dmg || { echo "dist/VRMirror.dmg missing"; exit 1; }
+          fi
+          ls -lh dist/
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: VRMirror-*.zip
+          path: |
+            dist/VRMirror.exe
+            dist/VRMirror.dmg
           if-no-files-found: error
 
   release:
@@ -74,5 +88,7 @@ jobs:
           path: artifacts
       - uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*.zip
+          files: |
+            artifacts/**/*.exe
+            artifacts/**/*.dmg
           generate_release_notes: true
