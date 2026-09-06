@@ -95,13 +95,25 @@ class ScreenrecordEngine:
         parts.append("-")
         return " ".join(parts)
 
+    @staticmethod
+    def _looks_like_video(probe: bytes) -> bool:
+        """H.264 from screenrecord always opens with an Annex-B start code.
+
+        Anything else is screenrecord talking, not encoding: a rejected flag
+        (older builds print usage and exit when --time-limit exceeds 180) or a
+        codec error. The exec: service merges stderr into the stream, so that
+        text would otherwise count as "produced output" and defeat the
+        fallback below.
+        """
+        return probe.startswith(b"\x00\x00\x00\x01") or probe.startswith(b"\x00\x00\x01")
+
     def stream(self):
         """Yield chunks forever, restarting screenrecord when it exits.
 
         Older builds cap --time-limit at 180 seconds and refuse to start with
         anything larger. We optimistically ask for the configured limit and,
-        if the first attempt dies without producing a single byte, drop back to
-        180 and remember that for the rest of the session.
+        if the first attempt dies without producing video, drop back to 180
+        and remember that for the rest of the session.
         """
         time_limit = self._time_limit
         first_attempt = True
@@ -109,6 +121,8 @@ class ScreenrecordEngine:
         while not self._stop:
             command = self._build_command(time_limit)
             log.info("starting capture: %s", command)
+            probe = bytearray()  # held until we know it is video
+            is_video = False
             produced = 0
             started = time.monotonic()
 
@@ -128,7 +142,18 @@ class ScreenrecordEngine:
                     if not chunk:
                         break
                     produced += len(chunk)
-                    yield chunk
+                    if is_video:
+                        yield chunk
+                        continue
+                    probe += chunk
+                    if len(probe) < 4:
+                        continue  # not enough to judge yet
+                    if self._looks_like_video(probe):
+                        is_video = True
+                        yield bytes(probe)
+                        probe.clear()
+                    elif len(probe) > 65536:
+                        break  # pure text never runs this long; stop reading it
             except AdbError as exc:
                 if not self._stop:
                     log.warning("capture stream error: %s", exc)
@@ -141,16 +166,21 @@ class ScreenrecordEngine:
                 break
 
             elapsed = time.monotonic() - started
-            if produced == 0:
+            if not is_video:
+                message = bytes(probe[:512]).decode("utf-8", "replace").strip()
+                if message:
+                    log.info("screenrecord said: %s", message)
                 if first_attempt and time_limit != 180:
-                    log.info("device rejected --time-limit %s, falling back to 180", time_limit)
+                    log.info("falling back to --time-limit 180")
                     time_limit = 180
                     first_attempt = False
                     continue
                 raise EngineUnavailable(
-                    "screenrecord produced no video. On a headset make sure the "
-                    "USB debugging prompt was accepted, and that no other "
-                    "capture or casting session is running."
+                    "screenrecord produced no video"
+                    + (f": {message}" if message else "")
+                    + ". On a headset make sure the USB debugging prompt was "
+                    "accepted, and that no other capture or casting session "
+                    "is running."
                 )
 
             first_attempt = False

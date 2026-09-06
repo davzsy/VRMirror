@@ -22,7 +22,7 @@ from .. import APP_NAME, __version__
 from ..adb.client import Adb, Device, DeviceInfo
 from ..capture.session import CaptureOptions, CaptureSession, Stats
 from ..config import Config
-from ..presets import preset_for
+from ..presets import GENERIC, effective_max_size, preset_for
 from .device_panel import DevicePanel
 from .settings_dialog import SettingsDialog
 from .video_view import VideoView
@@ -218,6 +218,7 @@ class MainWindow(QMainWindow):
 
         self._device_model = model
         preset = preset_for(model, manufacturer)
+        self._device_preset = preset
         resolution = f"{size[0]}x{size[1]}" if size else "unknown size"
         self.status_device.setText(f"{model or device.serial}  ·  {resolution}  ·  {preset.name}")
 
@@ -239,11 +240,12 @@ class MainWindow(QMainWindow):
         if self.device is None:
             self.show_message("Select a connected device first.")
             return
+        preset = getattr(self, "_device_preset", GENERIC)
         options = CaptureOptions(
             engine=self.config.capture.engine,
             bitrate_bps=int(self.config.capture.bitrate_mbps * 1_000_000),
             fps=self.config.capture.fps,
-            max_size=self.config.capture.max_size,
+            max_size=effective_max_size(self.config.capture.max_size, preset),
             time_limit_s=self.config.capture.time_limit_s,
         )
         self.status_stream.setText("Starting...")

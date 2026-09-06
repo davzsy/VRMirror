@@ -42,12 +42,12 @@ VR_DEFAULT = Preset(
 # Matched against ro.product.model, case insensitive, substring match.
 _MODEL_PRESETS: list[tuple[str, Preset]] = [
     (
-        "quest 3",
-        Preset("Meta Quest 3", 1440, 16.0, 72, "Crop to one eye for the clearest view."),
-    ),
-    (
         "quest 3s",
         Preset("Meta Quest 3S", 1440, 16.0, 72, "Crop to one eye for the clearest view."),
+    ),
+    (
+        "quest 3",
+        Preset("Meta Quest 3", 1440, 16.0, 72, "Crop to one eye for the clearest view."),
     ),
     (
         "quest pro",
@@ -75,3 +75,19 @@ def preset_for(model: str, manufacturer: str = "") -> Preset:
 
 def is_headset(model: str, manufacturer: str = "") -> bool:
     return preset_for(model, manufacturer) is not GENERIC
+
+
+def effective_max_size(configured: int, preset: Preset) -> int:
+    """Resolve the "Max dimension" setting into a value for the engine.
+
+    0 means automatic: use the preset's size for a headset, the device's
+    native resolution for anything else. Negative means the user explicitly
+    chose native. Positive values are used as given. Without this, a 4K
+    headset like the Pico G2 4K would be captured at 3840x2160, which its
+    encoder may refuse outright.
+    """
+    if configured > 0:
+        return configured
+    if configured == 0 and preset is not GENERIC:
+        return preset.max_size
+    return 0

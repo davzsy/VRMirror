@@ -20,7 +20,7 @@ from vrmirror.capture.h264 import (  # noqa: E402
     RecordGate,
     nal_type,
 )
-from vrmirror.presets import GENERIC, preset_for  # noqa: E402
+from vrmirror.presets import GENERIC, effective_max_size, preset_for  # noqa: E402
 
 
 def nal(kind: int, payload: bytes = b"\x00" * 4, long_start: bool = True) -> bytes:
@@ -121,6 +121,7 @@ class RecordGateTest(unittest.TestCase):
 class PresetTest(unittest.TestCase):
     def test_headsets_get_vr_presets(self) -> None:
         self.assertEqual(preset_for("Quest 3", "Oculus").name, "Meta Quest 3")
+        self.assertEqual(preset_for("Quest 3S", "Meta").name, "Meta Quest 3S")
         self.assertEqual(preset_for("Quest 2", "Oculus").name, "Meta Quest 2")
         self.assertIsNot(preset_for("Pico 4", "Pico"), GENERIC)
 
@@ -137,3 +138,24 @@ class PresetTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EffectiveMaxSizeTest(unittest.TestCase):
+    """0 = automatic (preset for headsets), negative = explicit native."""
+
+    def test_automatic_uses_the_headset_preset(self) -> None:
+        pico = preset_for("Pico G2 4K", "Pico")
+        self.assertEqual(effective_max_size(0, pico), pico.max_size)
+        self.assertEqual(pico.max_size, 1280)
+
+    def test_automatic_keeps_phones_native(self) -> None:
+        self.assertEqual(effective_max_size(0, GENERIC), 0)
+
+    def test_explicit_native_wins_even_on_a_headset(self) -> None:
+        pico = preset_for("Pico G2 4K", "Pico")
+        self.assertEqual(effective_max_size(-1, pico), 0)
+
+    def test_an_explicit_size_is_used_as_given(self) -> None:
+        quest = preset_for("Quest 3", "Meta")
+        self.assertEqual(effective_max_size(1024, quest), 1024)
+        self.assertEqual(effective_max_size(2048, GENERIC), 2048)

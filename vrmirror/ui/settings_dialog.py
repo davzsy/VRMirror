@@ -18,7 +18,8 @@ from ..capture.engines import NativeEngine
 from ..config import Config
 
 SIZE_CHOICES = [
-    ("Device native", 0),
+    ("Automatic (headset preset)", 0),
+    ("Device native", -1),
     ("2048 px", 2048),
     ("1600 px", 1600),
     ("1440 px", 1440),
